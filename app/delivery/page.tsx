@@ -32,6 +32,7 @@ export default function DeliveryDashboard() {
 
   // Estado de pedidos desde tu hook
   const { pedidos, loading, error, fetchPedidos } = useClientePedidosState()
+  console.log('Pedidos state:', { pedidos, loading, error })
 
   // Filtros básicos (puedes adaptarlos si usas search o pending)
   useEffect(() => {
@@ -45,7 +46,6 @@ export default function DeliveryDashboard() {
 
   // Combinar pedidos reales + escaneados
   const allOrders = [...scannedOrders, ...pedidos]
-
 
   const getStatusText = (status: string) => {
     switch (status) {
@@ -86,7 +86,21 @@ export default function DeliveryDashboard() {
     return <RouteMap onBack={() => setShowRouteMap(false)} />
   }
 
+  // Calcular ganancias totales con comisión
+
+  const commissionPercentage = 0.10; 
+
+  const totalEarnings = allOrders.reduce((sum, order) => {
+    return sum + Number(order.precio_total || 0) * commissionPercentage;
+  }, 0)
+
+  const totalOrders = allOrders.length;
+  const completedOrders = allOrders.filter(order => order.estado === "entregado").length;
+  const progress = totalOrders > 0 ? Math.round((completedOrders / totalOrders) * 100) : 0;
+
+
   return (
+    
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-green-50 dark:from-slate-900 dark:to-slate-800">
       {/* Header */}
       <div className="bg-white dark:bg-slate-800 shadow-sm">
@@ -111,11 +125,11 @@ export default function DeliveryDashboard() {
         {/* Stats Cards */}
         <div className="grid grid-cols-2 gap-4">
           <Card className="p-4 text-center">
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{deliveryStats.todayDeliveries}</div>
+            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{pedidos.length}</div>
             <div className="text-sm text-slate-600 dark:text-slate-300">Entregas hoy</div>
           </Card>
           <Card className="p-4 text-center">
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">${deliveryStats.earnings}</div>
+            <div className="text-2xl font-bold text-green-600 dark:text-green-400">${totalEarnings.toFixed(2)}</div>
             <div className="text-sm text-slate-600 dark:text-slate-300">Ganancias</div>
           </Card>
         </div>
@@ -132,7 +146,7 @@ export default function DeliveryDashboard() {
           <Card className="p-4 text-center">
             <div className="flex items-center justify-center mb-2">
               <TrendingUp className="h-5 w-5 text-blue-500 mr-1" />
-              <span className="text-xl font-bold text-slate-800 dark:text-white">{deliveryStats.progress}%</span>
+              <span className="text-xl font-bold text-slate-800 dark:text-white">{progress}%</span>
             </div>
             <div className="text-sm text-slate-600 dark:text-slate-300">Progreso del día</div>
           </Card>
@@ -147,11 +161,6 @@ export default function DeliveryDashboard() {
           Ver Ruta
         </Button>
 
-        {/* GPS Button */}
-        <Button variant="outline" className="w-full py-6 text-lg font-semibold border-2 bg-transparent">
-          <MapPin className="h-5 w-5 mr-2" />
-          GPS
-        </Button>
       </div>
 
       <div className="p-4 space-y-6">

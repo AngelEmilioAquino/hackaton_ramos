@@ -18,6 +18,8 @@ export default function AdminDashboard() {
   // Usar hooks de API para datos reales
   const { stats, loading: statsLoading, error: statsError, fetchStats } = useDashboardState()
   const { ordenes, loading: ordenesLoading, fetchOrdenes } = useOrdenesState()
+  console.log('Dashboard stats:', stats)
+  console.log('Ordenes state:', { ordenes, ordenesLoading })
 
   useEffect(() => {
     // Cargar estadísticas y órdenes al montar el componente
@@ -30,11 +32,25 @@ export default function AdminDashboard() {
     document.documentElement.classList.toggle("dark")
   }
 
+  const dailyIncomeFromOrders = ordenes.reduce((total, orden) => {
+  // Convertir precio_total a número por si viene como string
+  const price = parseFloat(String(orden.precio_total)) || 0
+  return total + price
+}, 0)
+
+// Formatear el ingreso diario como moneda local (DOP)  
+
+const formattedIncome = dailyIncomeFromOrders.toLocaleString("es-DO", {
+  style: "currency",
+  currency: "DOP", 
+  minimumFractionDigits: 2
+})
+
   // Usar datos reales o valores por defecto
   const dashboardStats = stats ? {
     activeOrders: stats.resumen.total_ordenes,
     completedToday: stats.ordenes.por_estado.entregada,
-    dailyIncome: stats.ordenes.ingresos_totales,
+    dailyIncome: formattedIncome,
     uniqueClients: stats.resumen.total_usuarios,
   } : {
     activeOrders: 0,
@@ -56,7 +72,9 @@ export default function AdminDashboard() {
     items: orden.tipo_servicio,
     stage: getStageFromEstado(orden.estado),
     priority: "Normal",
-    timeInStage: "15 min",
+    timeInStage : Date.now() - new Date(orden.fecha_creacion).getTime() > 48 * 60 * 60 * 1000
+  ? "48h+"
+  : "menos de 48h"
   }))
 
   function getStageFromEstado(estado: string) {
@@ -159,7 +177,7 @@ export default function AdminDashboard() {
 
         <div className="grid grid-cols-2 gap-4">
           <Card className="p-4 text-center">
-            <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">${dashboardStats.dailyIncome}</div>
+            <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{dashboardStats.dailyIncome}</div>
             <div className="text-sm text-slate-600 dark:text-slate-300">Ingresos del día</div>
           </Card>
           <Card className="p-4 text-center">
@@ -229,7 +247,7 @@ export default function AdminDashboard() {
             <div className="flex items-center space-x-2">
               {ordenesLoading && <Loader2 className="h-4 w-4 animate-spin" />}
               <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                {ordenes.length} activos
+                {dashboardStats.activeOrders} activos
               </Badge>
             </div>
           </div>
