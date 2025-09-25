@@ -16,6 +16,14 @@ export async function GET(request) {
       getAllServicios()
     ])
 
+    console.log(Array.isArray(ordenes), ordenes)
+    console.log(Array.isArray(usuarios), usuarios)
+    console.log(Array.isArray(servicios), servicios)
+
+    if (!Array.isArray(ordenes) || !Array.isArray(usuarios) || !Array.isArray(servicios)) {
+      throw new Error('Data fetched is not in expected array format')
+    }
+    
     // Calculate date range
     const now = new Date()
     const startDate = fecha_desde 

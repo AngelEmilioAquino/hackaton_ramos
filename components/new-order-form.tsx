@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { X, Plus, Minus, Calendar, MapPin, Check, Loader2 } from "lucide-react"
@@ -8,6 +8,87 @@ import toast from "react-hot-toast"
 import { useServicios } from "@/hooks/useServicios"
 import { useCreateOrden } from "@/hooks/useOrdenes"
 import { useCreateUsuario } from "@/hooks/useUsuarios"
+import Webcam from "react-webcam";
+
+interface DetectedItem {
+  id: number;
+  name: string;
+  price: number;
+  confidence: string;
+  quantity: number;
+  icon: string;
+}
+
+const CameraCapture = ({ onDetected }: { onDetected: (item: DetectedItem) => void }) => {
+  const webcamRef = useRef<Webcam>(null);
+  const [loading, setLoading] = useState(false);
+
+  const capture = async () => {
+    if (!webcamRef.current) return;
+
+    const imageSrc = webcamRef.current.getScreenshot();
+    if (!imageSrc) return;
+
+    setLoading(true);
+
+    try {
+      const base64 = imageSrc.split(",")[1];
+
+      const res = await fetch("/api/clarifai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ base64 }),
+      });
+
+      const data = await res.json();
+      const concept = data.outputs[0].data.concepts[0];
+
+      // Mapeo de precio
+      const priceMap: Record<string, number> = {
+        shirt: 250,
+        pants: 400,
+        dress: 500,
+        jacket: 600,
+      };
+      const price = priceMap[concept.name.toLowerCase()] || 300;
+
+      const detectedItem: DetectedItem = {
+        id: Date.now(),
+        name: concept.name,
+        price,
+        confidence: (concept.value * 100).toFixed(1),
+        quantity: 1,
+        icon: "👕",
+      };
+
+      onDetected(detectedItem);
+      toast.success(`Prenda detectada: ${concept.name} (${detectedItem.confidence}% confianza)`);
+    } catch (err) {
+      console.error(err);
+      toast.error("No se pudo detectar la prenda");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <Webcam
+        ref={webcamRef}
+        screenshotFormat="image/jpeg"
+        videoConstraints={{ facingMode: "environment" }}
+        className="rounded-lg w-full"
+      />
+      <button
+        onClick={capture}
+        disabled={loading}
+        className="p-2 bg-blue-500 text-white rounded w-full"
+      >
+        {loading ? "Analizando..." : "📸 Tomar Foto"}
+      </button>
+    </div>
+  );
+};
 
 interface NewOrderFormProps {
   onClose: () => void
@@ -26,6 +107,26 @@ export default function NewOrderForm({ onClose, onOrderCreated }: NewOrderFormPr
     email: "",
     telefono: "",
   })
+
+  // Función para convertir Date a formato compatible con datetime-local
+
+  const toLocalDateTimeInput = (date: Date) => {
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
+useEffect(() => {
+  const now = new Date();
+  setPickupDate(toLocalDateTimeInput(now));
+
+  const delivery = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+  setDeliveryDate(toLocalDateTimeInput(delivery));
+}, []);
 
   // API hooks
   const { data: serviciosData, loading: serviciosLoading } = useServicios()
@@ -272,46 +373,31 @@ export default function NewOrderForm({ onClose, onOrderCreated }: NewOrderFormPr
       case 2:
         return (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-slate-800 dark:text-white">Selecciona tus prendas</h3>
+            <h3 className="text-lg font-semibold text-slate-800 dark:text-white">
+              Toma una foto de tu prenda
+            </h3>
 
-            <div className="grid grid-cols-2 gap-3">
-              {clothingItems.map((item) => (
-                <Card key={item.id} className="p-4 cursor-pointer hover:shadow-md transition-shadow">
-                  <div className="text-center space-y-2">
-                    <div className="text-2xl">{item.icon}</div>
-                    <h4 className="font-medium text-slate-800 dark:text-white">{item.name}</h4>
-                    <p className="text-sm text-slate-600 dark:text-slate-300">${item.price}</p>
-                    <Button size="sm" onClick={() => addItem(item)} className="w-full">
-                      <Plus className="h-4 w-4 mr-1" />
-                      Agregar
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-            </div>
+            <CameraCapture
+              onDetected={(item) => setSelectedItems([...selectedItems, item])}
+            />
 
             {selectedItems.length > 0 && (
               <Card className="p-4 bg-blue-50 dark:bg-blue-900/20">
-                <h4 className="font-medium text-slate-800 dark:text-white mb-3">Prendas seleccionadas:</h4>
-                <div className="space-y-2">
-                  {selectedItems.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between">
-                      <span className="text-sm text-slate-700 dark:text-slate-300">
-                        {item.name} x{item.quantity}
-                      </span>
-                      <div className="flex items-center space-x-2">
-                        <Button size="sm" variant="outline" onClick={() => removeItem(item.id)}>
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <span className="text-sm font-medium">${item.price * item.quantity}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <h4 className="font-medium text-slate-800 dark:text-white mb-3">
+                  Prendas detectadas:
+                </h4>
+                {selectedItems.map((item) => (
+                  <div key={item.id} className="flex justify-between">
+                    <span>
+                      {item.name} x{item.quantity}
+                    </span>
+                    <span>${item.price}</span>
+                  </div>
+                ))}
               </Card>
             )}
           </div>
-        )
+        );
 
       case 3:
         return (
@@ -362,17 +448,18 @@ export default function NewOrderForm({ onClose, onOrderCreated }: NewOrderFormPr
       case 4:
         return (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-slate-800 dark:text-white">Programar recogida y entrega</h3>
+            <h3 className="text-lg font-semibold text-slate-800 dark:text-white">Programar servicio y entrega</h3>
 
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   <Calendar className="h-4 w-4 inline mr-1" />
-                  Fecha de recogida
+                  Fecha de servicio
                 </label>
                 <input
                   type="datetime-local"
                   value={pickupDate}
+                  readOnly
                   onChange={(e) => setPickupDate(e.target.value)}
                   className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-800 dark:text-white"
                 />
@@ -386,6 +473,7 @@ export default function NewOrderForm({ onClose, onOrderCreated }: NewOrderFormPr
                 <input
                   type="datetime-local"
                   value={deliveryDate}
+                  readOnly
                   onChange={(e) => setDeliveryDate(e.target.value)}
                   className="w-full p-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-800 dark:text-white"
                 />

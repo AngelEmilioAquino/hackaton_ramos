@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useEffect } from "react"
@@ -8,6 +9,7 @@ import { Progress } from "@/components/ui/progress"
 import { ArrowLeft, RefreshCw, Loader2, Package, Droplets, Wind, Shirt, CheckCircle, Clock, MapPin, User, DollarSign } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useOrden } from "@/hooks/useOrdenes"
+import { QRCodeCanvas } from "qrcode.react"
 
 interface TrackingPageProps {
   params: {
@@ -133,17 +135,17 @@ export default function TrackingPage({ params }: TrackingPageProps) {
   }
 
   if (error || !orden) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-500 mb-4">Error al cargar el pedido</p>
-          <Button onClick={() => router.push("/cliente")}>
-            Volver al inicio
-          </Button>
-        </div>
-      </div>
-    )
-  }
+  console.error("Error al cargar pedido:", error)   
+  return (
+    <div className="...">
+      <p className="text-red-500 mb-4">Error al cargar el pedido</p>
+      <p className="text-sm text-slate-500">{error}</p>  
+      <Button onClick={() => router.push("/cliente")}>
+        Volver al inicio
+      </Button>
+    </div>
+  )
+}
 
   const currentStageIndex = getCurrentStageIndex(orden.estado)
   const progressPercentage = currentStageIndex >= 0 ? ((currentStageIndex + 1) / orderStages.length) * 100 : 0
@@ -283,6 +285,21 @@ export default function TrackingPage({ params }: TrackingPageProps) {
             </div>
           </Card>
         )}
+
+        {/* QR del pedido */}
+        <Card className="p-6 flex flex-col items-center justify-center">
+          <h3 className="font-semibold text-slate-800 dark:text-white mb-4">Código QR del Pedido</h3>
+          <QRCodeCanvas
+            value={JSON.stringify(orden)} // Toda la info del pedido
+            size={180}
+            bgColor="#ffffff"
+            fgColor="#000000"
+            level="H"
+          />
+          <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">
+            Escanea este código para ver tu pedido en cualquier dispositivo.
+          </p>
+        </Card>
 
         {/* Contact Info */}
         <Card className="p-6">

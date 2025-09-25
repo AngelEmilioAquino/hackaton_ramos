@@ -7,6 +7,7 @@ export async function GET(request, { params }) {
     const { id } = params
     
     const orden = await getOrdenById(id)
+    console.log('Fetched orden:', orden)
     if (!orden) {
       return NextResponse.json(
         { error: 'Orden not found' },
@@ -15,7 +16,7 @@ export async function GET(request, { params }) {
     }
 
     // Get all related data
-    const [prendas, extras, historial, pagos] = await Promise.all([
+    const [prendas, extras, historial, pagos] = await ([
       getPrendasByOrdenId(id),
       getExtrasByOrdenId(id),
       getHistorialByOrdenId(id),
